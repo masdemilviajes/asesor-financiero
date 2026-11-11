@@ -13,7 +13,8 @@ function configProblem(): string | null {
     return `Faltan variables de entorno: ${missing.join(", ")}. Agrégalas en Vercel (Environment Variables) y vuelve a desplegar.`;
   }
   if (!/^https:\/\/[^\s/]+\.[^\s/]+\/?$/.test(url!)) {
-    return "NEXT_PUBLIC_SUPABASE_URL no es válida: debe ser la Project URL de Supabase, con la forma https://xxxxxxxx.supabase.co (sin nada después).";
+    // La Project URL es pública (viaja al navegador), así que se puede mostrar.
+    return `NEXT_PUBLIC_SUPABASE_URL no es válida: debe ser la Project URL de Supabase, con la forma https://xxxxxxxx.supabase.co (sin comillas y sin nada después).\n\nValor que tiene ahora: [${url!.slice(0, 120)}]`;
   }
   if (/^https?:\/\//.test(key!)) {
     return "NEXT_PUBLIC_SUPABASE_ANON_KEY parece una dirección web: ahí va la publishable key de Supabase, no la URL.";
