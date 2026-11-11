@@ -1,18 +1,16 @@
 "use client";
 
-import { useActionState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { login, type LoginState } from "./actions";
-
-const initialState: LoginState = { error: null };
+import { useFormAction } from "@/hooks/use-form-action";
+import { login } from "./actions";
 
 export function LoginForm() {
-  const [state, formAction, pending] = useActionState(login, initialState);
+  const { state, pending, onSubmit } = useFormAction(login);
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         <Label htmlFor="email">Correo</Label>
         <Input

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, type LucideIcon } from "lucide-react";
+import { ArrowLeftRight, LayoutDashboard, Settings, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
@@ -10,6 +10,8 @@ type NavItem = { href: string; label: string; icon: LucideIcon };
 // Las secciones se van agregando aquí conforme se construye cada fase.
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Inicio", icon: LayoutDashboard },
+  { href: "/movimientos", label: "Movimientos", icon: ArrowLeftRight },
+  { href: "/ajustes", label: "Ajustes", icon: Settings },
 ];
 
 function isActive(pathname: string, href: string) {
