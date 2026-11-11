@@ -21,7 +21,14 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
   const supabase = await createClient();
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    return { ok: false, error: "Correo o contraseña incorrectos." };
+    if (error.code === "invalid_credentials") {
+      return { ok: false, error: "Correo o contraseña incorrectos." };
+    }
+    // Cualquier otro fallo suele ser de configuración (llave o URL de Supabase).
+    return {
+      ok: false,
+      error: `No pude conectar con Supabase (${error.message}). Revisa NEXT_PUBLIC_SUPABASE_ANON_KEY en Vercel.`,
+    };
   }
 
   redirect("/");
