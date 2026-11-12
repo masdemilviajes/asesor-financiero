@@ -49,3 +49,8 @@ export function monthRange(mes: string): { start: string; end: string } {
 export function isValidMonth(mes: unknown): mes is string {
   return typeof mes === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(mes);
 }
+
+/** Elige singular o plural: plural(1, "fila", "filas") → "1 fila". */
+export function plural(n: number, singular: string, pluralForm: string): string {
+  return `${n} ${n === 1 ? singular : pluralForm}`;
+}

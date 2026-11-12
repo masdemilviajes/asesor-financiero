@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { parseAmount } from "@/lib/format";
 import { forcedDuplicateHash, transactionHash } from "@/lib/hash";
+import { markRecurring } from "@/lib/import/server";
 import { createClient } from "@/lib/supabase/server";
 import type { ActionState } from "@/lib/types";
 
@@ -67,6 +68,7 @@ export async function addTransaction(_prev: ActionState, formData: FormData): Pr
     return { ok: false, error: "No se pudo guardar el movimiento." };
   }
 
+  if (tipo === "gasto") await markRecurring(supabase);
   revalidateAll();
   return { ok: true };
 }
