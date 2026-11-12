@@ -29,6 +29,7 @@ function median(values: number[]): number {
 
 const MIN_MONTHS = 3;
 const TOLERANCE = 0.1; // ±10 % del monto típico
+const MIN_SHARE = 0.75; // al menos 3 de cada 4 cargos del comercio deben parecerse
 
 /** Devuelve los ids de los gastos que parecen cargos recurrentes mensuales. */
 export function findRecurringIds(transactions: RecurringCandidate[]): string[] {
@@ -52,7 +53,11 @@ export function findRecurringIds(transactions: RecurringCandidate[]): string[] {
       (t) => Math.abs(Number(t.monto) - typical) <= Math.max(typical * TOLERANCE, 1),
     );
     const months = new Set(similar.map((t) => t.fecha.slice(0, 7)));
-    if (months.size >= MIN_MONTHS) ids.push(...similar.map((t) => t.id));
+    // Compras mensuales de monto variable (una tienda en línea) no cuentan:
+    // la mayoría de los cargos del comercio tiene que rondar el mismo monto.
+    if (months.size >= MIN_MONTHS && similar.length >= list.length * MIN_SHARE) {
+      ids.push(...similar.map((t) => t.id));
+    }
   }
   return ids;
 }

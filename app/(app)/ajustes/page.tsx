@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ACCOUNT_TYPE_LABELS, type Account, type Category } from "@/lib/types";
 import { AccountDialog } from "./account-dialog";
 import { CategoryDialog } from "./category-dialog";
+import { RulesCard, type RuleRow } from "./rules-card";
 
 export const metadata: Metadata = { title: "Ajustes" };
 
@@ -15,10 +16,19 @@ const ROW =
 
 export default async function AjustesPage() {
   const supabase = await createClient();
-  const [accountsRes, categoriesRes] = await Promise.all([
+  const [accountsRes, categoriesRes, rulesRes] = await Promise.all([
     supabase.from("accounts").select("*").order("created_at"),
     supabase.from("categories").select("*").order("nombre"),
+    supabase
+      .from("categorization_rules")
+      .select("id, patron_texto, categories(nombre)")
+      .order("patron_texto"),
   ]);
+  const rules: RuleRow[] = ((rulesRes.data ?? []) as unknown as {
+    id: string;
+    patron_texto: string;
+    categories: { nombre: string } | null;
+  }[]).map((r) => ({ id: r.id, patron_texto: r.patron_texto, categoria: r.categories?.nombre ?? "—" }));
   const accounts = (accountsRes.data ?? []) as Account[];
   const categories = (categoriesRes.data ?? []) as Category[];
   const presupuestoTotal = categories.reduce((s, c) => s + Number(c.presupuesto_mensual), 0);
@@ -115,6 +125,8 @@ export default async function AjustesPage() {
           )}
         </CardContent>
       </Card>
+
+      <RulesCard rules={rules} />
     </div>
   );
 }

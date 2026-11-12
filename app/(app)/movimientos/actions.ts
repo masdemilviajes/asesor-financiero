@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { categoryFromRules, learnRule } from "@/lib/categorize-server";
 import { parseAmount } from "@/lib/format";
 import { forcedDuplicateHash, transactionHash } from "@/lib/hash";
 import { markRecurring } from "@/lib/import/server";
@@ -38,10 +39,14 @@ export async function addTransaction(_prev: ActionState, formData: FormData): Pr
   const parsed = transactionSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
-  const { fecha, descripcion, monto, tipo, account_id, category_id } = parsed.data;
+  const { fecha, descripcion, monto, tipo, account_id } = parsed.data;
   const forzar = formData.get("forzar") === "1";
 
   const supabase = await createClient();
+  // Si no eligió categoría, se intenta con las reglas aprendidas.
+  const category_id =
+    parsed.data.category_id ??
+    (tipo === "gasto" ? await categoryFromRules(supabase, descripcion) : null);
   const { error } = await supabase.from("transactions").insert({
     fecha,
     descripcion_original: descripcion,
@@ -90,7 +95,7 @@ export async function updateTransaction(
   // La huella se calcula con la descripción original, que no se edita.
   const { data: current } = await supabase
     .from("transactions")
-    .select("descripcion_original, fecha, monto")
+    .select("descripcion_original, fecha, monto, category_id")
     .eq("id", id)
     .single();
   if (!current) return { ok: false, error: "No encontré ese movimiento." };
@@ -121,6 +126,11 @@ export async function updateTransaction(
           ? "Ya existe otro movimiento con esa fecha, monto y descripción."
           : "No se pudo guardar el movimiento.",
     };
+  }
+
+  // Cada corrección de categoría crea o actualiza una regla.
+  if (tipo === "gasto" && category_id && category_id !== current.category_id) {
+    await learnRule(supabase, current.descripcion_original, category_id);
   }
 
   revalidateAll();

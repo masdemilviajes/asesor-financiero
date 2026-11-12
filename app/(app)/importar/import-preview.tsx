@@ -12,6 +12,7 @@ import { formatMoney } from "@/lib/config";
 import { formatDay, plural } from "@/lib/format";
 import type { Account } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { runCategorization, type CategorizeResult } from "../revisar/actions";
 import { confirmImport, type ConfirmResult, type PreviewRow } from "./actions";
 
 /** Vista previa común a CSV, Excel y PDF: se revisa y se confirma antes de guardar. */
@@ -35,6 +36,7 @@ export function ImportPreview({
   const [selected, setSelected] = useState<boolean[]>(() => rows.map((r) => !r.duplicado));
   const [accountId, setAccountId] = useState(suggestedAccountId ?? "");
   const [result, setResult] = useState<ConfirmResult | null>(null);
+  const [categorized, setCategorized] = useState<CategorizeResult | null>(null);
   const [pending, startTransition] = useTransition();
 
   const duplicates = rows.filter((r) => r.duplicado).length;
@@ -49,14 +51,15 @@ export function ImportPreview({
 
   function save() {
     startTransition(async () => {
-      setResult(
-        await confirmImport({
-          rows: chosen.map(({ fecha, descripcion, monto, tipo }) => ({ fecha, descripcion, monto, tipo })),
-          account_id: accountId,
-          nombre_archivo: fileName,
-          import_id: importId ?? null,
-        }),
-      );
+      const saved = await confirmImport({
+        rows: chosen.map(({ fecha, descripcion, monto, tipo }) => ({ fecha, descripcion, monto, tipo })),
+        account_id: accountId,
+        nombre_archivo: fileName,
+        import_id: importId ?? null,
+      });
+      setResult(saved);
+      // Con los movimientos ya guardados, se categorizan (reglas y luego IA).
+      if (saved.ok && saved.guardados > 0) setCategorized(await runCategorization());
     });
   }
 
@@ -83,13 +86,36 @@ export function ImportPreview({
               : ""}
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-2 sm:flex-row">
-          <Link href="/movimientos" className={cn(buttonVariants({ size: "lg" }), "h-11 px-5")}>
+        <CardContent className="flex flex-col gap-3">
+          {pending ? (
+            <p className="text-sm text-muted-foreground">Categorizando los gastos con IA…</p>
+          ) : categorized?.ok ? (
+            <p className="text-sm" data-testid="categorizacion">
+              Categorización: {categorized.porReglas} por tus reglas, {categorized.porIA} por la IA
+              y {categorized.porRevisar} por revisar.
+            </p>
+          ) : null}
+          <FormError
+            message={
+              categorized?.ok ? categorized.aviso : categorized ? categorized.error : undefined
+            }
+          />
+          <div className="flex flex-col gap-2 sm:flex-row">
+          {categorized?.ok && categorized.porRevisar > 0 ? (
+            <Link href="/revisar" className={cn(buttonVariants({ size: "lg" }), "h-11 px-5")}>
+              Revisar pendientes
+            </Link>
+          ) : null}
+          <Link
+            href="/movimientos"
+            className={cn(buttonVariants({ variant: "outline", size: "lg" }), "h-11 px-5")}
+          >
             Ver movimientos
           </Link>
           <Button variant="outline" size="lg" className="h-11 px-5" onClick={onReset}>
             Importar otro archivo
           </Button>
+          </div>
         </CardContent>
       </Card>
     );

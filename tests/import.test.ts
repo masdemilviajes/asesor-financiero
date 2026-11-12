@@ -165,4 +165,14 @@ describe("recurrentes", () => {
     ]);
     expect(ids.sort()).toEqual(["n1", "n2", "n3"]);
   });
+  it("acepta un recibo mensual que varía poco y descarta compras mensuales de monto variable", () => {
+    const meses = ["2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11"];
+    const luz = [139.98, 141.12, 130.53, 130.29, 119.2, 134.72];
+    const tienda = [86.97, 80.55, 85.69, 59.04, 115.09, 117.92];
+    const ids = findRecurringIds([
+      ...meses.map((m, i) => tx(`luz${i}`, `${m}-12`, luz[i], "Energy Australia")),
+      ...meses.map((m, i) => tx(`tienda${i}`, `${m}-07`, tienda[i], "Amazon")),
+    ]);
+    expect(ids.sort()).toEqual(["luz0", "luz1", "luz2", "luz3", "luz5"]);
+  });
 });
