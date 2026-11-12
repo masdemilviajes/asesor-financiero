@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { monthlyToWeekly } from "@/lib/budget";
 import { formatMoney } from "@/lib/config";
 import { createClient } from "@/lib/supabase/server";
 import { ACCOUNT_TYPE_LABELS, type Account, type Category } from "@/lib/types";
@@ -31,7 +32,10 @@ export default async function AjustesPage() {
   }[]).map((r) => ({ id: r.id, patron_texto: r.patron_texto, categoria: r.categories?.nombre ?? "—" }));
   const accounts = (accountsRes.data ?? []) as Account[];
   const categories = (categoriesRes.data ?? []) as Category[];
-  const presupuestoTotal = categories.reduce((s, c) => s + Number(c.presupuesto_mensual), 0);
+  const presupuestoTotal = categories.reduce(
+    (s, c) => s + monthlyToWeekly(c.presupuesto_mensual),
+    0,
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -87,7 +91,7 @@ export default async function AjustesPage() {
         <CardHeader>
           <CardTitle>Categorías</CardTitle>
           <CardDescription>
-            Presupuesto mensual total: {formatMoney(presupuestoTotal)}
+            Presupuesto semanal total: {formatMoney(presupuestoTotal)}
           </CardDescription>
           <CardAction>
             <CategoryDialog>
@@ -115,7 +119,7 @@ export default async function AjustesPage() {
                         <span className="truncate font-medium">{category.nombre}</span>
                       </span>
                       <span className="shrink-0 tabular-nums text-muted-foreground">
-                        {formatMoney(category.presupuesto_mensual)} / mes
+                        {formatMoney(monthlyToWeekly(category.presupuesto_mensual))} / semana
                       </span>
                     </button>
                   </CategoryDialog>

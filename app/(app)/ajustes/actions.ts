@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { weeklyToMonthly } from "@/lib/budget";
 import { parseAmount } from "@/lib/format";
 import { createClient } from "@/lib/supabase/server";
 import { ACCOUNT_TYPES, NEUTRAL_COLORS, type ActionState } from "@/lib/types";
@@ -28,9 +29,10 @@ const accountSchema = z.object({
   dia_limite_pago: optionalDay,
 });
 
+// El formulario pide el presupuesto por semana; en la base se guarda por mes.
 const categorySchema = z.object({
   nombre: z.string().trim().min(1, "Ponle un nombre a la categoría.").max(40),
-  presupuesto_mensual: amount.pipe(z.number().min(0, "El presupuesto no puede ser negativo.")),
+  presupuesto_semanal: amount.pipe(z.number().min(0, "El presupuesto no puede ser negativo.")),
   color_neutro: z.enum(NEUTRAL_COLORS),
 });
 
@@ -76,11 +78,18 @@ export async function saveCategory(_prev: ActionState, formData: FormData): Prom
   const parsed = categorySchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: firstError(parsed.error) };
 
+  const { nombre, presupuesto_semanal, color_neutro } = parsed.data;
+  const values = {
+    nombre,
+    color_neutro,
+    presupuesto_mensual: weeklyToMonthly(presupuesto_semanal),
+  };
+
   const supabase = await createClient();
   const id = String(formData.get("id") ?? "");
   const { error } = id
-    ? await supabase.from("categories").update(parsed.data).eq("id", id)
-    : await supabase.from("categories").insert(parsed.data);
+    ? await supabase.from("categories").update(values).eq("id", id)
+    : await supabase.from("categories").insert(values);
 
   if (error) {
     return {

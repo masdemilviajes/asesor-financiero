@@ -1,5 +1,6 @@
 "use client";
 
+import { FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -34,11 +35,7 @@ export function LoginForm() {
           className="h-11 text-base"
         />
       </div>
-      {state.error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {state.error}
-        </p>
-      ) : null}
+      <FormError message={state.error} />
       <Button type="submit" disabled={pending} className="h-11 text-base">
         {pending ? "Entrando…" : "Entrar"}
       </Button>

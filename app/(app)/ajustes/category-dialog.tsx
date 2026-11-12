@@ -14,6 +14,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { monthlyToWeekly } from "@/lib/budget";
 import {
   NEUTRAL_COLORS,
   type Category,
@@ -45,7 +46,8 @@ export function CategoryDialog({
         <DialogHeader>
           <DialogTitle>{category ? "Editar categoría" : "Nueva categoría"}</DialogTitle>
           <DialogDescription>
-            El presupuesto mensual es lo máximo que quieres gastar en esta categoría.
+            El presupuesto semanal es lo máximo que quieres gastar en esta categoría de lunes a
+            domingo.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
@@ -60,11 +62,13 @@ export function CategoryDialog({
               className={TOUCH_INPUT}
             />
           </Field>
-          <Field label="Presupuesto mensual" htmlFor="cat-presupuesto">
+          <Field label="Presupuesto por semana" htmlFor="cat-presupuesto">
             <Input
               id="cat-presupuesto"
-              name="presupuesto_mensual"
-              defaultValue={category ? String(category.presupuesto_mensual) : ""}
+              name="presupuesto_semanal"
+              defaultValue={
+                category ? monthlyToWeekly(category.presupuesto_mensual).toFixed(2) : ""
+              }
               inputMode="decimal"
               placeholder="0.00"
               required

@@ -1,3 +1,4 @@
+import { CircleAlert } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
@@ -29,9 +30,11 @@ export function Field({
 
 export function FormError({ message }: { message?: string }) {
   if (!message) return null;
+  // Sin rojo: en esta app el rojo se reserva para "excedido".
   return (
-    <p role="alert" className="text-sm text-destructive">
-      {message}
+    <p role="alert" className="flex items-start gap-2 text-sm font-medium">
+      <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden />
+      <span>{message}</span>
     </p>
   );
 }

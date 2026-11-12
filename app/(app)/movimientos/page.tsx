@@ -106,7 +106,7 @@ export default async function MovimientosPage({
       </div>
 
       {txRes.error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-sm font-medium">
           No pude cargar los movimientos: {txRes.error.message}
         </p>
       ) : transactions.length === 0 ? (

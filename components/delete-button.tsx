@@ -36,7 +36,7 @@ export function DeleteButton({
     <div className="flex items-center gap-2">
       <Button
         type="button"
-        variant="destructive"
+        variant="default"
         size="lg"
         className="h-11"
         disabled={pending}
@@ -60,7 +60,7 @@ export function DeleteButton({
       >
         Cancelar
       </Button>
-      {error ? <span className="text-xs text-destructive">{error}</span> : null}
+      {error ? <span className="text-xs font-medium">{error}</span> : null}
     </div>
   );
 }
