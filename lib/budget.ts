@@ -240,3 +240,21 @@ export function averageByCategory(
     })
     .sort((a, b) => b.exceso - a.exceso);
 }
+
+/** Gasto total por categoría en las `weeks` semanas que terminan en la de `start`. */
+export function spendByCategory(
+  categories: BudgetCategory[],
+  txs: BudgetTx[],
+  start: string,
+  weeks: number,
+  prorate: boolean,
+): { id: string; nombre: string; total: number }[] {
+  const totals = new Map<string, number>();
+  for (let i = 0; i < weeks; i++) {
+    for (const share of weekShares(txs, addDays(start, -7 * i), prorate)) {
+      const id = share.tx.category_id;
+      if (id) totals.set(id, (totals.get(id) ?? 0) + share.amount);
+    }
+  }
+  return categories.map((c) => ({ id: c.id, nombre: c.nombre, total: round2(totals.get(c.id) ?? 0) }));
+}

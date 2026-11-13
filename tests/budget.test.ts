@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   averageByCategory,
   categoryWeek,
+  spendByCategory,
   monthlyToWeekly,
   weekElapsed,
   weekShares,
@@ -130,6 +131,19 @@ describe("presupuesto semanal", () => {
     // Promedio de las 2 semanas completas anteriores: (70 + 30) / 2
     const avg = averageByCategory([cat("c", weeklyToMonthly(40))], txs, "2026-11-09", 2, true);
     expect(avg[0]).toMatchObject({ promedio: 50, presupuesto: 40, exceso: 10 });
+  });
+});
+
+describe("gasto por categoría (gráfico de sectores)", () => {
+  it("suma una o varias semanas y deja fuera lo que no tiene categoría", () => {
+    const cats = [cat("a", 0), cat("b", 0), cat("c", 0)];
+    const txs = [
+      tx("a1", "2026-11-10", 30, "a"), tx("a2", "2026-11-03", 20, "a"),
+      tx("b1", "2026-10-20", 50, "b"), tx("viejo", "2026-10-01", 999, "b"),
+      tx("bond", "2026-11-10", 1050, null),
+    ];
+    expect(spendByCategory(cats, txs, "2026-11-09", 1, true).map((c) => c.total)).toEqual([30, 0, 0]);
+    expect(spendByCategory(cats, txs, "2026-11-09", 4, true).map((c) => c.total)).toEqual([50, 50, 0]);
   });
 });
 

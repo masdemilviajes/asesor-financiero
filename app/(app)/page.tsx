@@ -3,14 +3,17 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CategoryWeekCard } from "@/components/category-week-card";
 import { BudgetBars } from "@/components/charts/budget-bars";
 import { HistoryBars } from "@/components/charts/history-bars";
+import { SpendingPie, type PieSlice } from "@/components/charts/spending-pie";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  spendByCategory,
   weekSummary,
   weeklyHistory,
   type BudgetCategory,
   type BudgetTx,
 } from "@/lib/budget";
+import { CATEGORY_COLORS, OTHER_COLOR } from "@/lib/chart-colors";
 import { formatMoney, todayInTimezone } from "@/lib/config";
 import { addDays, formatShortDay, formatWeek, isValidDate, weekStart } from "@/lib/dates";
 import { plural } from "@/lib/format";
@@ -47,7 +50,12 @@ export default async function DashboardPage({
 
   try {
     const [catRes, gastos, incomeRes, contribRes, pendingRes] = await Promise.all([
-      supabase.from("categories").select("id, nombre, presupuesto_mensual, color_neutro").order("nombre"),
+      // Por orden de creación: así cada categoría conserva siempre su color.
+      supabase
+        .from("categories")
+        .select("id, nombre, presupuesto_mensual, color_neutro")
+        .order("created_at")
+        .order("id"),
       fetchAll<BudgetTx>((from, to) =>
         supabase
           .from("transactions")
@@ -82,6 +90,16 @@ export default async function DashboardPage({
   const atRisk = summary.categorias.filter((c) => c.estado === "en_riesgo").length;
   const totalDiff = summary.gastado - summary.presupuesto;
   const noBudget = categories.length > 0 && summary.presupuesto === 0;
+
+  // Gráfico de sectores: un color fijo por categoría; de la novena en adelante, "Otras".
+  const pieSlices = (weeks: number): PieSlice[] => {
+    const spend = spendByCategory(categories, txs, start, weeks, prorate);
+    const main = spend.slice(0, CATEGORY_COLORS.length).map((c, i) => ({ ...c, color: CATEGORY_COLORS[i] }));
+    const rest = spend.slice(CATEGORY_COLORS.length).reduce((sum, c) => sum + c.total, 0);
+    return rest > 0
+      ? [...main, { id: "otras", nombre: "Otras", total: Math.round(rest * 100) / 100, color: OTHER_COLOR }]
+      : main;
+  };
 
   const query = (semana: string, fijos: boolean) => {
     const q = new URLSearchParams();
@@ -203,6 +221,33 @@ export default async function DashboardPage({
               </span>
               <span className="shrink-0 font-medium">Revisar</span>
             </Link>
+          ) : null}
+
+          {categories.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>En qué se va el gasto</CardTitle>
+                <CardDescription>Reparto del gasto por categoría</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SpendingPie
+                  periods={[
+                    {
+                      id: "semana",
+                      label: isCurrentWeek ? "Esta semana" : "Esa semana",
+                      detalle: formatWeek(start),
+                      slices: pieSlices(1),
+                    },
+                    {
+                      id: "cuatro",
+                      label: "Últimas 4 semanas",
+                      detalle: "4 semanas",
+                      slices: pieSlices(4),
+                    },
+                  ]}
+                />
+              </CardContent>
+            </Card>
           ) : null}
 
           <section className="flex flex-col gap-3" aria-labelledby="categorias">
