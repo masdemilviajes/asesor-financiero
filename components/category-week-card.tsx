@@ -28,7 +28,7 @@ function StatusBadge({ estado }: { estado: CategoryWeek["estado"] }) {
 }
 
 function paceText(c: CategoryWeek, isCurrentWeek: boolean): string {
-  if (c.ritmo === null) return "Sin presupuesto semanal definido.";
+  if (c.ritmo === null) return "Define su presupuesto semanal en Ajustes para medir el ritmo.";
   if (!isCurrentWeek) return "Semana cerrada.";
   const points = Math.round(Math.abs(c.ritmo));
   if (points < 1) return "Vas justo al ritmo de la semana.";
@@ -48,7 +48,7 @@ export function CategoryWeekCard({
   isCurrentWeek: boolean;
 }) {
   const exceeded = c.estado === "excedido";
-  const fill = c.porcentaje === null ? (c.gastado > 0 ? 100 : 0) : Math.min(c.porcentaje, 100);
+  const fill = c.porcentaje === null ? 0 : Math.min(c.porcentaje, 100);
 
   return (
     <Card size="sm">
@@ -68,13 +68,16 @@ export function CategoryWeekCard({
         <div className="flex items-baseline justify-between gap-3">
           <p className="tabular-nums">
             <span className="text-lg font-semibold">{formatMoney(c.gastado)}</span>
-            <span className="text-sm text-muted-foreground"> de {formatMoney(c.presupuesto)}</span>
+            {c.porcentaje !== null ? (
+              <span className="text-sm text-muted-foreground"> de {formatMoney(c.presupuesto)}</span>
+            ) : null}
           </p>
           <p className={cn("text-sm tabular-nums", exceeded ? "font-medium" : "text-muted-foreground")}>
-            {c.diferencia > 0
-              ? `${formatMoney(c.diferencia)} de más`
-              : `${formatMoney(Math.abs(c.diferencia))} disponibles`}
-            {c.porcentaje !== null ? ` · ${Math.round(c.porcentaje)}%` : ""}
+            {c.porcentaje === null
+              ? "sin presupuesto"
+              : c.diferencia > 0
+                ? `${formatMoney(c.diferencia)} de más · ${Math.round(c.porcentaje)}%`
+                : `${formatMoney(Math.abs(c.diferencia))} disponibles · ${Math.round(c.porcentaje)}%`}
           </p>
         </div>
 
@@ -102,7 +105,7 @@ export function CategoryWeekCard({
 
         <p className="text-xs text-muted-foreground">
           {paceText(c, isCurrentWeek)}
-          {isCurrentWeek && c.gastado > 0
+          {isCurrentWeek && c.gastado > 0 && c.ritmo !== null
             ? ` Proyección al domingo: ${formatMoney(c.proyeccion)}.`
             : ""}
         </p>

@@ -96,6 +96,13 @@ describe("presupuesto semanal", () => {
     expect(result.ritmo).toBeCloseTo(0);
   });
 
+  it("una categoría sin presupuesto no se marca como excedida", () => {
+    const shares = weekShares([tx("a", "2026-11-09", 80, "x")], "2026-11-09", true);
+    expect(categoryWeek(cat("x", 0), shares, 1 / 7)).toMatchObject({
+      estado: "sin_presupuesto", gastado: 80, porcentaje: null, ritmo: null,
+    });
+  });
+
   it("ordena de mayor a menor exceso y muestra los 3 movimientos más grandes", () => {
     const cats = [cat("a", weeklyToMonthly(100)), cat("b", weeklyToMonthly(100)), cat("c", 0)];
     const txs = [

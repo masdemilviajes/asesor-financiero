@@ -81,6 +81,7 @@ export default async function DashboardPage({
   const exceeded = summary.categorias.filter((c) => c.estado === "excedido").length;
   const atRisk = summary.categorias.filter((c) => c.estado === "en_riesgo").length;
   const totalDiff = summary.gastado - summary.presupuesto;
+  const noBudget = categories.length > 0 && summary.presupuesto === 0;
 
   const query = (semana: string, fijos: boolean) => {
     const q = new URLSearchParams();
@@ -138,16 +139,24 @@ export default async function DashboardPage({
                 <CardTitle className="text-xl tabular-nums">{formatMoney(summary.gastado)}</CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-muted-foreground">
-                de {formatMoney(summary.presupuesto)} de presupuesto
+                {noBudget
+                  ? "en gastos con categoría"
+                  : `de ${formatMoney(summary.presupuesto)} de presupuesto`}
               </CardContent>
             </Card>
             <Card size="sm">
               <CardHeader>
-                <CardDescription>{totalDiff > 0 ? "De más" : "Disponible"}</CardDescription>
-                <CardTitle className="text-xl tabular-nums">{formatMoney(Math.abs(totalDiff))}</CardTitle>
+                <CardDescription>
+                  {noBudget ? "Presupuesto" : totalDiff > 0 ? "De más" : "Disponible"}
+                </CardDescription>
+                <CardTitle className="text-xl tabular-nums">
+                  {noBudget ? "Sin definir" : formatMoney(Math.abs(totalDiff))}
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-xs text-muted-foreground">
-                {exceeded > 0
+                {noBudget
+                  ? "ponlo en Ajustes"
+                  : exceeded > 0
                   ? plural(exceeded, "categoría excedida", "categorías excedidas")
                   : atRisk > 0
                     ? plural(atRisk, "categoría en riesgo", "categorías en riesgo")
@@ -169,6 +178,19 @@ export default async function DashboardPage({
               <CardContent className="text-xs text-muted-foreground">aportado a tus metas</CardContent>
             </Card>
           </div>
+
+          {noBudget ? (
+            <Link
+              href="/ajustes"
+              className="flex min-h-12 items-center justify-between gap-3 rounded-xl border px-4 py-2 text-sm transition-colors hover:bg-muted/60"
+            >
+              <span>
+                Aún no defines tu presupuesto semanal. Ponle un monto a cada categoría para ver
+                en cuáles te pasas.
+              </span>
+              <span className="shrink-0 font-medium">Ir a Ajustes</span>
+            </Link>
+          ) : null}
 
           {pendientes > 0 ? (
             <Link

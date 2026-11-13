@@ -130,9 +130,8 @@ export function categoryWeek(
     const pace = ((variable + fixed * elapsed) / presupuesto) * 100;
     ritmo = pace - elapsed * 100;
     estado = gastado > presupuesto + 0.005 ? "excedido" : ritmo > RISK_POINTS ? "en_riesgo" : "ok";
-  } else if (gastado > 0) {
-    estado = "excedido";
   }
+  // Sin presupuesto definido no hay contra qué comparar: no es "excedido".
 
   const top = [...own]
     .sort((a, b) => b.amount - a.amount)
@@ -182,7 +181,8 @@ export function weekSummary(
   const elapsed = weekElapsed(options.start, options.today);
   const categorias = categories
     .map((c) => categoryWeek(c, shares, elapsed))
-    .sort((a, b) => b.diferencia - a.diferencia);
+    // A igual exceso, primero donde más se ha gastado.
+    .sort((a, b) => b.diferencia - a.diferencia || b.gastado - a.gastado);
 
   const known = new Set(categories.map((c) => c.id));
   const sinCategoria = shares
