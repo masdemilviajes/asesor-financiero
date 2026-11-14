@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
+import { ArrowLeftRight, Sparkles } from "lucide-react";
 import { FormError } from "@/components/field";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -39,6 +39,15 @@ export function ReviewList({
     if (!result.ok) return setError(result.error);
 
     setResolved((prev) => new Set(prev).add(t.id));
+    if (categoryId === "transferencia") {
+      setMessage(
+        result.extra > 1
+          ? `Marcado como transferencia, junto con ${plural(result.extra - 1, "movimiento parecido", "movimientos parecidos")}. Ya no cuentan como gasto.`
+          : "Marcado como transferencia: ya no cuenta como gasto. La próxima vez se detectará sola.",
+      );
+      router.refresh();
+      return;
+    }
     const name = categories.find((c) => c.id === categoryId)?.nombre;
     setMessage(
       !name
@@ -58,6 +67,9 @@ export function ReviewList({
       if (!result.ok) return setError(result.error);
       setMessage(
         `Categorizados: ${result.porReglas} por tus reglas y ${result.porIA} por la IA. ` +
+          (result.transferencias > 0
+            ? `${plural(result.transferencias, "transferencia detectada", "transferencias detectadas")}. `
+            : "") +
           `${plural(result.porRevisar, "queda", "quedan")} por revisar.`,
       );
       if (result.aviso) setError(result.aviso);
@@ -132,6 +144,14 @@ export function ReviewList({
                       </button>
                     );
                   })}
+                  <button
+                    type="button"
+                    disabled={busyId !== null}
+                    onClick={() => choose(t, "transferencia")}
+                    className="flex min-h-10 items-center gap-1.5 rounded-full border border-dashed px-3.5 text-sm text-muted-foreground transition-colors hover:bg-muted disabled:pointer-events-none"
+                  >
+                    <ArrowLeftRight className="size-3.5" aria-hidden /> Es transferencia
+                  </button>
                   <button
                     type="button"
                     disabled={busyId !== null}

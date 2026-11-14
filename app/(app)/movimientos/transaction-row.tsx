@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useFormAction } from "@/hooks/use-form-action";
-import { Repeat2 } from "lucide-react";
+import { ArrowLeftRight, Repeat2 } from "lucide-react";
 import { DeleteButton } from "@/components/delete-button";
 import { FormError } from "@/components/field";
 import { Badge } from "@/components/ui/badge";
@@ -70,16 +70,28 @@ export function TransactionRow({
                     />
                     {t.categories.nombre}
                   </span>
-                ) : t.tipo === "gasto" ? (
+                ) : t.tipo === "transferencia" ? (
+                  <span className="flex items-center gap-1">
+                    <ArrowLeftRight className="size-3" aria-hidden /> Transferencia
+                  </span>
+                ) : t.tipo === "ingreso" ? (
+                  <span>Ingreso</span>
+                ) : t.requiere_revision ? (
                   <Badge variant="outline">Por revisar</Badge>
                 ) : (
-                  <span>Ingreso</span>
+                  <span>Sin categoría</span>
                 )}
                 {t.accounts ? <span>· {t.accounts.nombre}</span> : null}
               </span>
             </span>
-            <span className="shrink-0 tabular-nums">
-              {t.tipo === "ingreso" ? "+" : "−"}
+            <span
+              className={
+                t.tipo === "transferencia"
+                  ? "shrink-0 text-muted-foreground tabular-nums"
+                  : "shrink-0 tabular-nums"
+              }
+            >
+              {t.tipo === "ingreso" ? "+" : t.tipo === "gasto" ? "−" : ""}
               {formatMoney(t.monto)}
             </span>
           </button>

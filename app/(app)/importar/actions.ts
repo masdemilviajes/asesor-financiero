@@ -3,13 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { existingHashes, markRecurring, withHashes } from "@/lib/import/server";
+import { isMissingMigration, MIGRATION_MESSAGE } from "@/lib/rules-server";
 import { createClient } from "@/lib/supabase/server";
+import { markTransfers } from "@/lib/transfers-server";
+import { TRANSACTION_TYPES } from "@/lib/types";
 
 const rowSchema = z.object({
   fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   descripcion: z.string().trim().min(1).max(500),
   monto: z.number().positive().max(1_000_000_000),
-  tipo: z.enum(["gasto", "ingreso"]),
+  tipo: z.enum(TRANSACTION_TYPES),
 });
 
 const rowsSchema = z.array(rowSchema).min(1).max(3000);
@@ -50,7 +53,7 @@ const confirmSchema = z.object({
 });
 
 export type ConfirmResult =
-  | { ok: true; guardados: number; duplicados: number; recurrentes: number }
+  | { ok: true; guardados: number; duplicados: number; recurrentes: number; transferencias: number }
   | { ok: false; error: string };
 
 /** Guarda los movimientos confirmados, descartando los duplicados. */
@@ -95,7 +98,10 @@ export async function confirmImport(input: unknown): Promise<ConfirmResult> {
       .select("id");
     if (error) {
       await supabase.from("imports").update({ estado: "error" }).eq("id", importId);
-      return { ok: false, error: "No se pudieron guardar los movimientos." };
+      return {
+        ok: false,
+        error: isMissingMigration(error) ? MIGRATION_MESSAGE : "No se pudieron guardar los movimientos.",
+      };
     }
     guardados += data.length;
   }
@@ -105,7 +111,18 @@ export async function confirmImport(input: unknown): Promise<ConfirmResult> {
     .update({ estado: "confirmado", movimientos_detectados: rows.length })
     .eq("id", importId);
 
+  // Traspasos entre cuentas propias y conversiones: dejan de contar antes de
+  // buscar recurrentes y de categorizar.
+  const transfers = importId ? await markTransfers(supabase, importId) : { count: 0 };
+  const yaTransferencias = rows.filter((r) => r.tipo === "transferencia").length;
+
   const recurrentes = await markRecurring(supabase);
   revalidatePath("/", "layout");
-  return { ok: true, guardados, duplicados: rows.length - guardados, recurrentes };
+  return {
+    ok: true,
+    guardados,
+    duplicados: rows.length - guardados,
+    recurrentes,
+    transferencias: transfers.count + Math.min(yaTransferencias, guardados),
+  };
 }

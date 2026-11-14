@@ -3,9 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { categorizePending, learnRule, type CategorizeSummary } from "@/lib/categorize-server";
+import { MIGRATION_MESSAGE } from "@/lib/rules-server";
 import { createClient } from "@/lib/supabase/server";
+import { learnTransferRule, setAsTransfer } from "@/lib/transfers-server";
 
 const idSchema = z.uuid();
+
+/** Valor especial de resolveReview para marcar un movimiento como transferencia. */
+const TRANSFER = "transferencia";
 
 export type ResolveResult = { ok: true; extra: number } | { ok: false; error: string };
 
@@ -18,11 +23,32 @@ export async function resolveReview(
   categoryId: string | null,
 ): Promise<ResolveResult> {
   if (!idSchema.safeParse(transactionId).success) return { ok: false, error: "Movimiento no válido." };
-  if (categoryId !== null && !idSchema.safeParse(categoryId).success) {
+  if (categoryId !== null && categoryId !== TRANSFER && !idSchema.safeParse(categoryId).success) {
     return { ok: false, error: "Categoría no válida." };
   }
 
   const supabase = await createClient();
+
+  // "Es transferencia": deja de contar como gasto y se aprende la regla.
+  if (categoryId === TRANSFER) {
+    const { data: row } = await supabase
+      .from("transactions")
+      .select("descripcion_original")
+      .eq("id", transactionId)
+      .single();
+    if (!row) return { ok: false, error: "No encontré ese movimiento." };
+    const moved = await setAsTransfer(supabase, [transactionId]);
+    if (moved.count === 0) {
+      return {
+        ok: false,
+        error: moved.missingMigration ? MIGRATION_MESSAGE : "No se pudo guardar el cambio.",
+      };
+    }
+    const extra = await learnTransferRule(supabase, row.descripcion_original);
+    revalidatePath("/", "layout");
+    return { ok: true, extra: extra + 1 };
+  }
+
   const { data: tx, error } = await supabase
     .from("transactions")
     .update({ category_id: categoryId, requiere_revision: false })

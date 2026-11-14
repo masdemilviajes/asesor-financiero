@@ -48,6 +48,10 @@ export default async function MovimientosPage({
     .filter((t) => t.tipo === "ingreso")
     .reduce((s, t) => s + Number(t.monto), 0);
 
+  const transferencias = transactions
+    .filter((t) => t.tipo === "transferencia")
+    .reduce((s, t) => s + Number(t.monto), 0);
+
   // Agrupa por día, conservando el orden (más reciente primero).
   const byDay = new Map<string, TransactionWithRefs[]>();
   for (const t of transactions) {
@@ -104,6 +108,13 @@ export default async function MovimientosPage({
           </CardHeader>
         </Card>
       </div>
+
+      {transferencias > 0 ? (
+        <p className="-mt-3 text-sm text-muted-foreground">
+          Transferencias entre tus cuentas y conversiones: {formatMoney(transferencias)}. No
+          cuentan como gasto ni como ingreso.
+        </p>
+      ) : null}
 
       {txRes.error ? (
         <p role="alert" className="text-sm font-medium">

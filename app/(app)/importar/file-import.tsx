@@ -11,6 +11,7 @@ import {
   buildTransactions,
   cleanRows,
   detectColumns,
+  singleSign,
   type Cell,
   type ColumnMapping,
   type DateOrder,
@@ -192,7 +193,17 @@ export function FileImport({ accounts }: ImportContext) {
               ) : (
                 <>
                   {columnSelect("map-monto", "Monto", "monto")}
-                  <Field label="Signo del monto" htmlFor="map-signo">
+                  <Field
+                    label="Signo del monto"
+                    htmlFor="map-signo"
+                    hint={
+                      rows && singleSign(rows, mapping)
+                        ? mapping.signo === "positivo_gasto"
+                          ? "Todos los montos tienen el mismo signo y los estoy leyendo como gastos. Si son depósitos, cámbialo."
+                          : "Todos los montos tienen el mismo signo y los estoy leyendo como ingresos. Si son compras, cámbialo."
+                        : undefined
+                    }
+                  >
                     <NativeSelect
                       id="map-signo"
                       value={mapping.signo}

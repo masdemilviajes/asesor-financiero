@@ -2,8 +2,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { AiError, askJson } from "@/lib/anthropic";
-import { applyRules, rulePattern, type Rule } from "@/lib/categorize";
+import { applyRules, matchRules, rulePattern } from "@/lib/categorize";
 import { CURRENCY } from "@/lib/config";
+import { loadRules, upsertRule } from "@/lib/rules-server";
+import { setAsTransfer } from "@/lib/transfers-server";
 
 const BATCH_SIZE = 60; // movimientos por llamada a la IA
 const MAX_PER_RUN = 600;
@@ -15,6 +17,7 @@ const aiSchema = z.object({
       categoria_id: z.string().nullable(),
       confianza: z.enum(["alta", "media", "baja"]),
       comercio: z.string(),
+      es_transferencia: z.boolean(),
     }),
   ),
 });
@@ -26,6 +29,8 @@ Para cada movimiento devuelve:
 - "categoria_id": el id de la categoría que mejor corresponde, tomado de la lista; null si ninguna encaja.
 - "confianza": "alta" si el comercio y la categoría son evidentes; "media" si es probable; "baja" si es una suposición (transferencias a personas, textos crípticos, comercios desconocidos, pagos genéricos).
 - "comercio": nombre corto y legible del comercio, sin números de sucursal, ciudades ni códigos ("WOOLWORTHS 1294 SYDNEY" → "Woolworths"). Si no se reconoce, deja la descripción limpia.
+
+- "es_transferencia": true solo si el movimiento NO es un gasto real sino dinero que el usuario mueve entre sus propias cuentas (las de la lista "Cuentas del usuario"), el pago de su propia tarjeta de crédito, o una conversión de moneda. Un pago o transferencia a otra persona o a un comercio es un gasto: false. En caso de duda, false con confianza "baja". Si es true, pon "categoria_id" en null.
 
 Usa solo ids de la lista de categorías. Devuelve un resultado por cada movimiento recibido.`;
 
@@ -41,14 +46,11 @@ export type CategorizeSummary = {
   porReglas: number;
   porIA: number;
   porRevisar: number;
+  /** Marcados como transferencia (no cuentan como gasto). */
+  transferencias: number;
   /** Mensaje si la IA no pudo usarse (las reglas se aplican igual). */
   aviso?: string;
 };
-
-async function loadRules(supabase: SupabaseClient): Promise<Rule[]> {
-  const { data } = await supabase.from("categorization_rules").select("patron_texto, category_id");
-  return (data ?? []) as Rule[];
-}
 
 /**
  * Categoriza los gastos sin categoría:
@@ -56,9 +58,9 @@ async function loadRules(supabase: SupabaseClient): Promise<Rule[]> {
  * 3) deja en "Por revisar" lo que tenga confianza baja o no encaje.
  */
 export async function categorizePending(supabase: SupabaseClient): Promise<CategorizeSummary> {
-  const summary: CategorizeSummary = { porReglas: 0, porIA: 0, porRevisar: 0 };
+  const summary: CategorizeSummary = { porReglas: 0, porIA: 0, porRevisar: 0, transferencias: 0 };
 
-  const [{ data: pendingData }, { data: categories }, rules] = await Promise.all([
+  const [{ data: pendingData }, { data: categories }, { data: accounts }, rules] = await Promise.all([
     supabase
       .from("transactions")
       .select("id, descripcion_original, comercio, monto, fecha")
@@ -68,6 +70,7 @@ export async function categorizePending(supabase: SupabaseClient): Promise<Categ
       .order("fecha", { ascending: false })
       .limit(MAX_PER_RUN),
     supabase.from("categories").select("id, nombre").order("nombre"),
+    supabase.from("accounts").select("nombre, tipo"),
     loadRules(supabase),
   ]);
 
@@ -77,8 +80,14 @@ export async function categorizePending(supabase: SupabaseClient): Promise<Categ
   // 1) Reglas
   const byCategory = new Map<string, string[]>();
   const forAi: Pending[] = [];
+  const transferIds: string[] = [];
   for (const t of pending) {
-    const categoryId = applyRules(t.descripcion_original, rules);
+    const match = matchRules(t.descripcion_original, rules);
+    if (match?.kind === "transferencia") {
+      transferIds.push(t.id);
+      continue;
+    }
+    const categoryId = match?.kind === "categoria" ? match.category_id : null;
     if (categoryId) byCategory.set(categoryId, [...(byCategory.get(categoryId) ?? []), t.id]);
     // "comercio" vacío = la IA todavía no lo ha visto. Así no se vuelve a
     // enviar (ni a cobrar) lo que ya revisó y dejó sin categoría.
@@ -93,6 +102,12 @@ export async function categorizePending(supabase: SupabaseClient): Promise<Categ
         .in("id", ids.slice(i, i + 100));
     }
     summary.porReglas += ids.length;
+  }
+
+  if (transferIds.length > 0) {
+    const result = await setAsTransfer(supabase, transferIds);
+    summary.transferencias += result.count;
+    if (result.count === 0) summary.porRevisar += transferIds.length;
   }
 
   // 2) IA, en lotes y en paralelo
@@ -110,6 +125,7 @@ export async function categorizePending(supabase: SupabaseClient): Promise<Categ
         content: [
           `Moneda: ${CURRENCY}.`,
           `Categorías: ${JSON.stringify(categories)}`,
+          `Cuentas del usuario: ${JSON.stringify(accounts ?? [])}`,
           `Movimientos: ${JSON.stringify(
             batch.map((t, indice) => ({
               indice,
@@ -139,6 +155,15 @@ export async function categorizePending(supabase: SupabaseClient): Promise<Categ
       const t = batch[r.indice];
       if (!t || seen.has(r.indice)) continue;
       seen.add(r.indice);
+
+      // Traspaso propio o conversión de moneda: no es un gasto.
+      if (r.es_transferencia && r.confianza !== "baja") {
+        const moved = await setAsTransfer(supabase, [t.id]);
+        if (moved.count > 0) {
+          summary.transferencias++;
+          continue;
+        }
+      }
 
       const categoryId = r.categoria_id && validIds.has(r.categoria_id) ? r.categoria_id : null;
       // 3) Confianza baja o sin categoría: se queda en la bandeja "Por revisar".
@@ -172,10 +197,7 @@ export async function learnRule(
   const patron = rulePattern(description);
   if (!patron) return 0;
 
-  await supabase.from("categorization_rules").upsert(
-    { patron_texto: patron, category_id: categoryId, updated_at: new Date().toISOString() },
-    { onConflict: "user_id,patron_texto" },
-  );
+  await upsertRule(supabase, { patron_texto: patron, category_id: categoryId, es_transferencia: false });
 
   const { data: pending } = await supabase
     .from("transactions")

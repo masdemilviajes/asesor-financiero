@@ -22,14 +22,19 @@ export default async function AjustesPage() {
     supabase.from("categories").select("*").order("nombre"),
     supabase
       .from("categorization_rules")
-      .select("id, patron_texto, categories(nombre)")
+      .select("*, categories(nombre)")
       .order("patron_texto"),
   ]);
   const rules: RuleRow[] = ((rulesRes.data ?? []) as unknown as {
     id: string;
     patron_texto: string;
+    es_transferencia?: boolean;
     categories: { nombre: string } | null;
-  }[]).map((r) => ({ id: r.id, patron_texto: r.patron_texto, categoria: r.categories?.nombre ?? "—" }));
+  }[]).map((r) => ({
+    id: r.id,
+    patron_texto: r.patron_texto,
+    categoria: r.es_transferencia ? "Transferencia (no cuenta)" : (r.categories?.nombre ?? "—"),
+  }));
   const accounts = (accountsRes.data ?? []) as Account[];
   const categories = (categoriesRes.data ?? []) as Category[];
   const presupuestoTotal = categories.reduce(

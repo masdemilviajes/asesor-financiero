@@ -22,7 +22,7 @@ const statementSchema = z.object({
       fecha: z.string(),
       descripcion: z.string(),
       monto: z.number(),
-      tipo: z.enum(["gasto", "ingreso"]),
+      tipo: z.enum(["gasto", "ingreso", "transferencia"]),
     }),
   ),
   ultimos4_cuenta: z.string().nullable(),
@@ -34,7 +34,7 @@ const SYSTEM = `Extraes los movimientos de un estado de cuenta bancario o de tar
 - "fecha": YYYY-MM-DD. Si el documento omite el año, dedúcelo del periodo del estado de cuenta.
 - "descripcion": el texto del movimiento tal como aparece, sin la fecha ni el monto.
 - "monto": número positivo, sin símbolos ni separadores de miles.
-- "tipo": "gasto" para dinero que sale o cargos a la tarjeta; "ingreso" para dinero que entra (depósitos, sueldo, reembolsos) y para pagos hechos a la tarjeta de crédito.
+- "tipo": "gasto" para dinero que sale o cargos a la tarjeta; "ingreso" para dinero que entra (depósitos, sueldo, reembolsos); "transferencia" cuando el dinero solo cambia de sitio y sigue siendo del titular: traspasos entre sus propias cuentas (ahorro, inversión, otra cuenta a su nombre), pagos a su propia tarjeta de crédito (tanto en la cuenta desde la que se paga como en la tarjeta que lo recibe) y conversiones de moneda. Una transferencia o pago a otra persona o empresa es "gasto". Si no está claro que sea entre cuentas propias, usa "gasto" o "ingreso".
 - No incluyas saldos iniciales o finales, totales, subtotales, límites de crédito, pagos mínimos ni resúmenes.
 - "ultimos4_cuenta": los últimos 4 dígitos de la cuenta o tarjeta si aparecen; si no, null. Nunca el número completo.
 - Si el documento no es un estado de cuenta o no tiene movimientos, devuelve una lista vacía.`;

@@ -6,8 +6,10 @@ import { categoryFromRules, learnRule } from "@/lib/categorize-server";
 import { parseAmount } from "@/lib/format";
 import { forcedDuplicateHash, transactionHash } from "@/lib/hash";
 import { markRecurring } from "@/lib/import/server";
+import { isMissingMigration, MIGRATION_MESSAGE } from "@/lib/rules-server";
 import { createClient } from "@/lib/supabase/server";
-import type { ActionState } from "@/lib/types";
+import { learnTransferRule } from "@/lib/transfers-server";
+import { TRANSACTION_TYPES, type ActionState } from "@/lib/types";
 
 const optionalId = z.preprocess(
   (v) => (v === "" || v == null ? null : v),
@@ -21,7 +23,7 @@ const transactionSchema = z.object({
     parseAmount,
     z.number({ error: "Escribe un monto válido." }).positive("El monto debe ser mayor a cero."),
   ),
-  tipo: z.enum(["gasto", "ingreso"]),
+  tipo: z.enum(TRANSACTION_TYPES),
   account_id: optionalId,
   category_id: optionalId,
 });
@@ -45,8 +47,9 @@ export async function addTransaction(_prev: ActionState, formData: FormData): Pr
   const supabase = await createClient();
   // Si no eligió categoría, se intenta con las reglas aprendidas.
   const category_id =
-    parsed.data.category_id ??
-    (tipo === "gasto" ? await categoryFromRules(supabase, descripcion) : null);
+    tipo !== "gasto"
+      ? null
+      : (parsed.data.category_id ?? (await categoryFromRules(supabase, descripcion)));
   const { error } = await supabase.from("transactions").insert({
     fecha,
     descripcion_original: descripcion,
@@ -70,6 +73,9 @@ export async function addTransaction(_prev: ActionState, formData: FormData): Pr
         error: "Ya registraste un movimiento con la misma fecha, monto y descripción.",
       };
     }
+    if (tipo === "transferencia" && isMissingMigration(error)) {
+      return { ok: false, error: MIGRATION_MESSAGE };
+    }
     return { ok: false, error: "No se pudo guardar el movimiento." };
   }
 
@@ -89,13 +95,15 @@ export async function updateTransaction(
     return { ok: false, error: parsed.success ? "Falta el movimiento." : firstError(parsed.error) };
   }
 
-  const { fecha, descripcion, monto, tipo, account_id, category_id } = parsed.data;
+  const { fecha, descripcion, monto, tipo, account_id } = parsed.data;
+  // Una transferencia no lleva categoría.
+  const category_id = tipo === "gasto" ? parsed.data.category_id : null;
   const supabase = await createClient();
 
   // La huella se calcula con la descripción original, que no se edita.
   const { data: current } = await supabase
     .from("transactions")
-    .select("descripcion_original, fecha, monto, category_id")
+    .select("descripcion_original, fecha, monto, category_id, tipo")
     .eq("id", id)
     .single();
   if (!current) return { ok: false, error: "No encontré ese movimiento." };
@@ -111,7 +119,9 @@ export async function updateTransaction(
       tipo,
       account_id,
       category_id,
-      requiere_revision: tipo === "gasto" && !category_id,
+      // Editarlo a mano cuenta como revisado, aunque se deje sin categoría.
+      requiere_revision: false,
+      ...(tipo === "transferencia" ? { es_recurrente: false } : {}),
       ...(changedKey
         ? { hash_unico: transactionHash(fecha, monto, current.descripcion_original) }
         : {}),
@@ -124,13 +134,17 @@ export async function updateTransaction(
       error:
         error.code === "23505"
           ? "Ya existe otro movimiento con esa fecha, monto y descripción."
-          : "No se pudo guardar el movimiento.",
+          : tipo === "transferencia" && isMissingMigration(error)
+            ? MIGRATION_MESSAGE
+            : "No se pudo guardar el movimiento.",
     };
   }
 
-  // Cada corrección de categoría crea o actualiza una regla.
+  // Cada corrección enseña una regla: de categoría o de "esto es una transferencia".
   if (tipo === "gasto" && category_id && category_id !== current.category_id) {
     await learnRule(supabase, current.descripcion_original, category_id);
+  } else if (tipo === "transferencia" && current.tipo !== "transferencia") {
+    await learnTransferRule(supabase, current.descripcion_original);
   }
 
   revalidateAll();

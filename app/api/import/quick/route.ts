@@ -12,7 +12,7 @@ const quickSchema = z.object({
   entendido: z.boolean(),
   monto: z.number(),
   descripcion: z.string(),
-  tipo: z.enum(["gasto", "ingreso"]),
+  tipo: z.enum(["gasto", "ingreso", "transferencia"]),
   fecha: z.string(),
   cuenta_id: z.string().nullable(),
   categoria_id: z.string().nullable(),
@@ -22,7 +22,7 @@ const SYSTEM = `Interpretas una línea de captura rápida de un movimiento perso
 
 - "monto": número positivo, sin símbolos.
 - "descripcion": corta, con mayúscula inicial y sin el monto ni la cuenta (ej. "Súper").
-- "tipo": "gasto" por defecto; "ingreso" solo si el texto habla de cobrar, recibir, sueldo, depósito, reembolso o similar.
+- "tipo": "gasto" por defecto; "ingreso" solo si el texto habla de cobrar, recibir, sueldo, depósito, reembolso o similar; "transferencia" si mueve dinero entre sus propias cuentas ("pasé 200 a ahorro", "pagué la tarjeta") o convierte moneda ("cambié 500 a euros"). Enviar dinero a otra persona es "gasto".
 - "fecha": YYYY-MM-DD. Usa la fecha de hoy salvo que el texto diga otra ("ayer", "el lunes", "3 de mayo").
 - "cuenta_id": el id de la cuenta que mejor coincide con lo que dice el texto ("con débito", "en efectivo", "tarjeta"), o null si no la menciona.
 - "categoria_id": el id de la categoría más adecuada de la lista, o null si ninguna encaja con claridad.
@@ -73,7 +73,9 @@ export async function POST(request: Request) {
       fecha: /^\d{4}-\d{2}-\d{2}$/.test(result.fecha) ? result.fecha : today,
       account_id: result.cuenta_id && accountIds.has(result.cuenta_id) ? result.cuenta_id : null,
       category_id:
-        result.categoria_id && categoryIds.has(result.categoria_id) ? result.categoria_id : null,
+        result.tipo === "gasto" && result.categoria_id && categoryIds.has(result.categoria_id)
+          ? result.categoria_id
+          : null,
     });
   } catch (error) {
     const message = error instanceof AiError ? error.message : "No pude interpretar el texto.";

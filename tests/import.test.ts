@@ -6,6 +6,7 @@ import {
   maskSensitive,
   parseCellAmount,
   parseDate,
+  singleSign,
 } from "@/lib/import/parse";
 import { occurrenceHash, transactionHash } from "@/lib/hash";
 import { findRecurringIds, merchantKey } from "@/lib/recurring";
@@ -102,6 +103,23 @@ describe("detectColumns + buildTransactions", () => {
     const mapping = detectColumns(rows);
     expect(mapping.signo).toBe("positivo_gasto");
     expect(buildTransactions(rows, mapping).rows.every((r) => r.tipo === "gasto")).toBe(true);
+  });
+
+  it("cuenta de ahorro con solo depósitos positivos: son ingresos, no gastos", () => {
+    const rows = [
+      ["Date", "Description", "Amount"],
+      ["12/11/2026", "DEPOSIT 7781", "200.00"],
+      ["12/11/2026", "INTEREST PAID", "3.10"],
+    ];
+    const mapping = detectColumns(rows);
+    expect(mapping.signo).toBe("negativo_gasto");
+    expect(singleSign(rows, mapping)).toBe(true);
+    expect(buildTransactions(rows, mapping).rows.map((r) => r.tipo)).toEqual(["ingreso", "ingreso"]);
+  });
+
+  it("singleSign es falso cuando hay montos de ambos signos", () => {
+    const rows = [["01/11/2026", "-5.00", "CAFE"], ["02/11/2026", "50.00", "REFUND"]];
+    expect(singleSign(rows, detectColumns(rows))).toBe(false);
   });
 
   it("fechas de Excel (objetos Date) y montos numéricos", () => {

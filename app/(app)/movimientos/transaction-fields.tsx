@@ -5,7 +5,13 @@ import { Field, TOUCH_INPUT, TOUCH_SELECT } from "@/components/field";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { cn } from "@/lib/utils";
-import type { Account, Category, TransactionType } from "@/lib/types";
+import { TRANSACTION_TYPES, type Account, type Category, type TransactionType } from "@/lib/types";
+
+const TYPE_LABELS: Record<TransactionType, string> = {
+  gasto: "Gasto",
+  ingreso: "Ingreso",
+  transferencia: "Transferencia",
+};
 
 export type TransactionDefaults = {
   fecha: string;
@@ -35,8 +41,8 @@ export function TransactionFields({
   return (
     <>
       <input type="hidden" name="tipo" value={tipo} />
-      <div className="grid grid-cols-2 gap-1 rounded-lg bg-muted p-1" role="group" aria-label="Tipo">
-        {(["gasto", "ingreso"] as const).map((t) => (
+      <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1" role="group" aria-label="Tipo">
+        {TRANSACTION_TYPES.map((t) => (
           <button
             key={t}
             type="button"
@@ -47,10 +53,16 @@ export function TransactionFields({
               tipo === t && "bg-background text-foreground shadow-sm",
             )}
           >
-            {t === "gasto" ? "Gasto" : "Ingreso"}
+            {TYPE_LABELS[t]}
           </button>
         ))}
       </div>
+      {tipo === "transferencia" ? (
+        <p className="text-xs text-muted-foreground">
+          Traspaso entre tus cuentas, pago de tu tarjeta o conversión de moneda. No cuenta como
+          gasto ni como ingreso.
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Monto" htmlFor={`${idPrefix}-monto`}>
@@ -104,7 +116,11 @@ export function TransactionFields({
             ))}
           </NativeSelect>
         </Field>
-        <Field label="Categoría" htmlFor={`${idPrefix}-categoria`}>
+        <Field
+          label="Categoría"
+          htmlFor={`${idPrefix}-categoria`}
+          className={tipo === "gasto" ? undefined : "hidden"}
+        >
           <NativeSelect
             id={`${idPrefix}-categoria`}
             name="category_id"

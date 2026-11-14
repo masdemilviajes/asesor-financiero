@@ -18,8 +18,8 @@ export function RulesCard({ rules }: { rules: RuleRow[] }) {
       <CardHeader>
         <CardTitle>Reglas aprendidas</CardTitle>
         <CardDescription>
-          Se crean solas cuando corriges una categoría. Si una descripción contiene estas palabras,
-          se le asigna esa categoría.
+          Se crean solas cuando corriges una categoría o marcas una transferencia. Si una
+          descripción contiene estas palabras, se le aplica lo mismo.
         </CardDescription>
       </CardHeader>
       <CardContent className="px-0">

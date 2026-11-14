@@ -84,6 +84,11 @@ export function ImportPreview({
                 ? " 1 quedó marcado como recurrente."
                 : ` ${result.recurrentes} quedaron marcados como recurrentes.`
               : ""}
+            {result.transferencias > 0
+              ? result.transferencias === 1
+                ? " 1 es una transferencia entre tus cuentas y no cuenta como gasto ni ingreso."
+                : ` ${result.transferencias} son transferencias entre tus cuentas y no cuentan como gasto ni ingreso.`
+              : ""}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
@@ -93,6 +98,9 @@ export function ImportPreview({
             <p className="text-sm" data-testid="categorizacion">
               Categorización: {categorized.porReglas} por tus reglas, {categorized.porIA} por la IA
               y {categorized.porRevisar} por revisar.
+              {categorized.transferencias > 0
+                ? ` Además, ${categorized.transferencias === 1 ? "1 gasto resultó ser una transferencia" : `${categorized.transferencias} gastos resultaron ser transferencias`}.`
+                : ""}
             </p>
           ) : null}
           <FormError
@@ -177,10 +185,11 @@ export function ImportPreview({
                   <span className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="first-letter:uppercase">{formatDay(row.fecha)}</span>
                     {row.duplicado ? <Badge variant="outline">Ya registrado</Badge> : null}
+                    {row.tipo === "transferencia" ? <Badge variant="outline">Transferencia</Badge> : null}
                   </span>
                 </span>
                 <span className="shrink-0 tabular-nums">
-                  {row.tipo === "ingreso" ? "+" : "−"}
+                  {row.tipo === "ingreso" ? "+" : row.tipo === "gasto" ? "−" : ""}
                   {formatMoney(row.monto)}
                 </span>
               </label>

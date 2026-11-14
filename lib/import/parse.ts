@@ -124,6 +124,29 @@ function isEmpty(cell: Cell): boolean {
   return cell == null || String(cell).trim() === "";
 }
 
+const INCOME_WORDS =
+  /\b(deposit|deposito|interest|interes(es)?|salary|payroll|wages|nomina|sueldo|refund|reembolso|devolucion|credit|abono|dividend|transfer from|transferencia (de|recibida)|cashback|payment received)\b/;
+
+/** ¿La descripción suena a dinero que entra? */
+export function looksLikeIncome(description: string): boolean {
+  return INCOME_WORDS.test(
+    description
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase(),
+  );
+}
+
+/** ¿Todos los montos de una columna tienen el mismo signo? (hay que confirmar cuál es) */
+export function singleSign(allRows: Cell[][], mapping: ColumnMapping): boolean {
+  if (mapping.monto === null) return false;
+  const values = cleanRows(allRows)
+    .slice(mapping.hasHeader ? 1 : 0)
+    .map((r) => parseCellAmount(r[mapping.monto as number]))
+    .filter((n) => !Number.isNaN(n) && n !== 0);
+  return values.length > 0 && (values.every((n) => n > 0) || values.every((n) => n < 0));
+}
+
 /** Quita filas totalmente vacías. */
 export function cleanRows(rows: Cell[][]): Cell[][] {
   return rows.filter((row) => row.some((cell) => !isEmpty(cell)));
@@ -216,7 +239,21 @@ export function detectColumns(allRows: Cell[][]): ColumnMapping {
   }
 
   if (mapping.monto !== null) {
-    mapping.signo = stats[mapping.monto]?.negatives > 0 ? "negativo_gasto" : "positivo_gasto";
+    if (stats[mapping.monto]?.negatives > 0) {
+      mapping.signo = "negativo_gasto";
+    } else {
+      // Todos positivos: puede ser una tarjeta (todo son cargos) o una cuenta
+      // de ahorro (todo son depósitos). Las descripciones desempatan.
+      const descriptions =
+        mapping.descripcion !== null
+          ? data.map((r) => String(r[mapping.descripcion as number] ?? "")).filter(Boolean)
+          : [];
+      const incomeLike = descriptions.filter(looksLikeIncome).length;
+      mapping.signo =
+        descriptions.length > 0 && incomeLike >= descriptions.length / 2
+          ? "negativo_gasto"
+          : "positivo_gasto";
+    }
   }
 
   return mapping;

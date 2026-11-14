@@ -27,7 +27,13 @@ export type Category = {
   color_neutro: string;
 };
 
-export type TransactionType = "gasto" | "ingreso";
+/**
+ * "transferencia": traspaso entre cuentas propias o conversión de moneda.
+ * No cuenta como gasto ni como ingreso.
+ */
+export type TransactionType = "gasto" | "ingreso" | "transferencia";
+
+export const TRANSACTION_TYPES = ["gasto", "ingreso", "transferencia"] as const;
 
 export type Transaction = {
   id: string;
